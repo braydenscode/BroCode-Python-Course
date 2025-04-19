@@ -11,7 +11,7 @@ employee = {
 employees = [["Name", "Age", "Job"],
                 ["Spongebob", 30, "Cook"],
                 ["Patrick", 37, "Unemployed"],
-                ["andy", 27, "Scientist"]]
+                ["Sandy", 27, "Scientist"]]
 # employees = ["Eugene", "Squidward", "Spongebob", "Patrick"]
 txt_data = "I like pizza!"
 
