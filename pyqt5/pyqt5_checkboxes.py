@@ -1,3 +1,4 @@
+# PyQt5 Checkboxes
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QCheckBox
 from PyQt5.QtCore import Qt
@@ -12,7 +13,7 @@ class MainWindow(QMainWindow):
     def initUI(self):
         self.checkbox.setGeometry(10, 0, 500, 100)
         self.checkbox.setStyleSheet("font-size: 30px;"
-                                    "font-family: Ariel;")
+                                    "font-family: Arial;")
         self.checkbox.setChecked(False)
 
         self.checkbox.stateChanged.connect(self.checkbox_changed)
