@@ -5,6 +5,7 @@ import datetime
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QGraphicsDropShadowEffect
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QLinearGradient, QColor, QBrush, QGradient
+from PyQt5.QtSvg import QSvgWidget
 
 class WeatherApp(QWidget):
     WEATHER_GRADIENTS = {
@@ -35,13 +36,15 @@ class WeatherApp(QWidget):
         self.change_unit_button = QPushButton("°C", self)
         self.change_unit_button.hide()
         self.temperature_label = QLabel(self)
-        self.emoji_label = QLabel(self)
+        self.emoji_svg = QSvgWidget(self)
+        self.emoji_svg.setFixedSize(100, 100)
         self.description_label = QLabel(self)
         self.initUI()
 
         self.weather_data = None
         self.unit_is_fahrenheit = True
         self.temperature_k = None
+        self.is_daytime = None
 
     def initUI(self):
         self.setAutoFillBackground(True)
@@ -57,7 +60,7 @@ class WeatherApp(QWidget):
         vbox.addWidget(self.city_input)
         vbox.addWidget(self.get_weather_button)
         vbox.addLayout(temp_layout)
-        vbox.addWidget(self.emoji_label)
+        vbox.addWidget(self.emoji_svg, alignment=Qt.AlignCenter)
         vbox.addWidget(self.description_label)
 
         self.setLayout(vbox)
@@ -67,7 +70,6 @@ class WeatherApp(QWidget):
         self.city_label.setAlignment(Qt.AlignCenter)
         self.city_input.setAlignment(Qt.AlignCenter)
         self.temperature_label.setAlignment(Qt.AlignCenter)
-        self.emoji_label.setAlignment(Qt.AlignCenter)
         self.description_label.setAlignment(Qt.AlignCenter)
 
         self.city_label.setObjectName("city_label")
@@ -75,7 +77,7 @@ class WeatherApp(QWidget):
         self.get_weather_button.setObjectName("get_weather_button")
         self.change_unit_button.setObjectName("change_unit_button")
         self.temperature_label.setObjectName("temperature_label")
-        self.emoji_label.setObjectName("emoji_label")
+        self.emoji_svg.setObjectName("emoji_svg")
         self.description_label.setObjectName("description_label")
 
         self.add_text_shadow(self.city_label)
@@ -125,12 +127,14 @@ class WeatherApp(QWidget):
         painter = QPainter(self)
         rect = self.rect()
 
-        top_color = "#a1c4fd"
-        bottom_color = "#c2e9fb"
+        default_top_color = "#a1c4fd"
+        default_bottom_color = "#c2e9fb"
+
+        top_color = default_top_color
+        bottom_color = default_bottom_color
 
         if self.weather_data:
             weather_main = self.weather_data["weather"][0]["main"]
-            top_color, bottom_color = self.WEATHER_GRADIENTS.get(weather_main, (top_color, bottom_color))
 
             sunrise_timestamp = self.weather_data["sys"]["sunrise"]
             sunset_timestamp = self.weather_data["sys"]["sunset"]
@@ -140,14 +144,13 @@ class WeatherApp(QWidget):
             sunset_time = datetime.datetime.fromtimestamp(sunset_timestamp, tz=datetime.timezone(datetime.timedelta(seconds=timezone_offset)))
             current_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(seconds=timezone_offset)))
 
-            is_daytime = sunrise_time < current_time < sunset_time
+            self.is_daytime = sunrise_time < current_time < sunset_time
 
-            if not is_daytime:
-                if weather_main == "Clear":
-                    key = "Clear_day" if is_daytime else "Clear_night"
-                else:
-                    key = weather_main
-                top_color, bottom_color = self.WEATHER_GRADIENTS.get(key, (top_color, bottom_color))
+            if weather_main == "Clear":
+                key = "Clear_day" if self.is_daytime else "Clear_night"
+            else:
+                key = weather_main
+            top_color, bottom_color = self.WEATHER_GRADIENTS.get(key, (default_top_color, default_bottom_color))
 
 
         gradient = QLinearGradient(0, 0, 0, rect.height())
@@ -163,7 +166,7 @@ class WeatherApp(QWidget):
         url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}"
 
         self.temperature_label.setText("")
-        self.emoji_label.clear()
+        # self.emoji_label.clear()
         self.description_label.clear()
 
         self.get_weather_button.setEnabled(False)
@@ -216,7 +219,7 @@ class WeatherApp(QWidget):
     def display_error(self, message):
         self.temperature_label.setStyleSheet("font-size: 30px;")
         self.temperature_label.setText(message)
-        self.emoji_label.clear()
+        # self.emoji_label.clear()
         self.description_label.clear()
 
     def display_weather(self, data=None):
@@ -226,7 +229,7 @@ class WeatherApp(QWidget):
             self.temperature_k = data["main"]["temp"]
             weather_id = data["weather"][0]["id"]
             weather_description = data["weather"][0]["description"]
-            self.emoji_label.setText(self.get_weather_emoji(weather_id))
+            self.load_weather_icon(weather_id)
             self.description_label.setText(weather_description.capitalize())
 
         if self.temperature_k is not None:
@@ -247,30 +250,93 @@ class WeatherApp(QWidget):
         self.change_unit_button.setText("°F" if not self.unit_is_fahrenheit else "°C")
         self.display_weather()
 
-    @staticmethod
-    def get_weather_emoji(weather_id):
-        if 200 <= weather_id <= 232:
-            return "⛈"
+    def load_weather_icon(self, weather_id):
+        if 200 <= weather_id <= 202 or 230 <= weather_id <= 232:
+            if self.is_daytime:
+                icon = "thunderstorms-day-rain"
+            else:
+                icon = "thunderstorms-night-rain"
+        elif 210 <= weather_id <= 221:
+            if self.is_daytime:
+                icon = "thunderstorms-day"
+            else:
+                icon = "thunderstorms-night"
         elif 300 <= weather_id <= 321:
-            return "🌦"
+            if self.is_daytime:
+                icon = "partly-cloudy-day-drizzle"
+            else:
+                icon = "partly-cloudy-night-drizzle"
         elif 500 <= weather_id <= 531:
-            return "🌧"
-        elif 600 <= weather_id <= 622:
-            return "❄"
-        elif 701 <= weather_id <= 741:
-            return "🌫"
+            if self.is_daytime:
+                icon = "partly-cloudy-day-rain"
+            else:
+                icon = "partly-cloudy-night-rain"
+        elif 600 <= weather_id <= 602 or 620 <= weather_id <= 622:
+            if self.is_daytime:
+                icon = "partly-cloudy-day-snow"
+            else:
+                icon = "partly-cloudy-night-snow"
+        elif 611 <= weather_id <= 613:
+            if self.is_daytime:
+                icon = "partly-cloudy-day-hail"
+            else:
+                icon = "partly-cloudy-night-hail"
+        elif 615 <= weather_id <= 616:
+            if self.is_daytime:
+                icon = "partly-cloudy-day-sleet"
+            else:
+                icon = "partly-cloudy-night-sleet"
+        elif weather_id == 701:
+            icon = "mist"
+        elif weather_id == 711:
+            if self.is_daytime:
+                icon = "partly-cloudy-day-smoke"
+            else:
+                icon = "partly-cloudy-night-smoke"
+        elif weather_id == 721:
+            if self.is_daytime:
+                icon = "haze-day"
+            else:
+                icon = "haze-night"
+        elif weather_id == 731:
+            icon = "dust-wind"
+        elif weather_id == 741:
+            if self.is_daytime:
+                icon = "fog-day"
+            else:
+                icon = "fog-night"
+        elif weather_id == 751 or weather_id == 761:
+            if self.is_daytime:
+                icon = "dust-day"
+            else:
+                icon = "dust-night"
         elif weather_id == 762:
-            return "🌋"
+            icon = "smoke-particles"
         elif weather_id == 771:
-            return "💨"
+            icon = "wind"
         elif weather_id == 781:
-            return "🌪"
+            icon = "tornado"
         elif weather_id == 800:
-            return "☀"
-        elif 801 <= weather_id <= 804:
-            return "☁"
+            if self.is_daytime:
+                icon = "clear-day"
+            else:
+                icon = "clear-night"
+        elif 801 <= weather_id <= 803:
+            if self.is_daytime:
+                icon = "overcast-day"
+            else:
+                icon = "overcast-night"
+        elif weather_id == 804:
+            icon = "overcast"
         else:
-            return ""
+            icon = "unknown"
+
+        path = os.path.join("weather_conditions", f"{icon}.svg")
+        if os.path.exists(path):
+            self.emoji_svg.load(path)
+            self.emoji_svg.show()
+        else:
+            self.emoji_svg.hide()
 
 
 if __name__ == "__main__":
